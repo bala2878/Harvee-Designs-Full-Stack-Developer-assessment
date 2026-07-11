@@ -1,4 +1,4 @@
-# AI SQL Assistant
+# AI SQL Assistant (Task 1)
 
 Upload any CSV/Excel dataset, get its schema auto-detected and loaded into a
 dynamically created PostgreSQL table, then query it with natural language —
