@@ -1,0 +1,40 @@
+name: Deploy to AWS VPS
+
+on:
+  workflow_run:
+    workflows:
+      - "Task 1 - Backend CI"
+      - "Task 1 - Frontend CI"
+      - "Task 2 - Backend CI"
+      - "Task 2 - Frontend CI"
+    branches: [main]
+    types: [completed]
+
+jobs:
+  deploy:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_DEPLOY_USER }}
+          key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+          script: |
+            cd /opt/harvee-assessment
+            ./deploy/deploy.sh
+
+# Required repository secrets (Settings → Secrets and variables → Actions):
+#   VPS_HOST              e.g. 123.45.67.89
+#   VPS_DEPLOY_USER        e.g. deploy  (a non-root user with docker + sudo group membership)
+#   VPS_SSH_PRIVATE_KEY    private key matching a public key in that user's ~/.ssh/authorized_keys
+#
+# NOTE: `workflow_run` triggers independently per upstream workflow — a push
+# that only touches task1-course-allocation/backend will fire this job after
+# "Task 1 - Backend CI" completes, WITHOUT waiting for the (unaffected,
+# non-triggered) Task 2 workflows. deploy.sh itself always rebuilds/restarts
+# both stacks regardless of which one changed, which is deliberately simple
+# for a two-service assessment submission — the alternative (deploying only
+# the changed task) would need a small dispatcher script keyed off which
+# workflow_run fired, not worth the complexity here.

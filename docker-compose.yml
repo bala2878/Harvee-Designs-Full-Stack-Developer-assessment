@@ -1,0 +1,107 @@
+version: "3.9"
+
+# Unified local-dev stack for both assessment tasks. Each task gets its own
+# Postgres instance (simplest way to keep Task 1's allocation schema and
+# Task 2's dynamic per-upload tables from ever colliding) and its own
+# frontend/backend pair on distinct ports. Run the whole thing with
+# `docker compose up --build`, or target a subset, e.g.:
+#   docker compose up --build task1-db task1-backend task1-frontend
+
+services:
+  # ---------------- Task 1: Course Allocation ----------------
+  task1-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${TASK1_POSTGRES_USER:-allocation_user}
+      POSTGRES_PASSWORD: ${TASK1_POSTGRES_PASSWORD:-allocation_pass}
+      POSTGRES_DB: ${TASK1_POSTGRES_DB:-allocation_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - task1_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${TASK1_POSTGRES_USER:-allocation_user}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  task1-backend:
+    build: ./task1-course-allocation/backend
+    restart: unless-stopped
+    env_file:
+      - ./task1-course-allocation/backend/.env
+    environment:
+      POSTGRES_SERVER: task1-db
+      POSTGRES_PORT: 5432
+    depends_on:
+      task1-db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./task1-course-allocation/backend:/app
+
+  task1-frontend:
+    build:
+      context: ./task1-course-allocation/frontend
+      target: dev
+    restart: unless-stopped
+    depends_on:
+      - task1-backend
+    ports:
+      - "4200:4200"
+    volumes:
+      - ./task1-course-allocation/frontend:/app
+      - /app/node_modules
+
+  # ---------------- Task 2: AI SQL Assistant ----------------
+  task2-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${TASK2_POSTGRES_USER:-sqlassistant_user}
+      POSTGRES_PASSWORD: ${TASK2_POSTGRES_PASSWORD:-sqlassistant_pass}
+      POSTGRES_DB: ${TASK2_POSTGRES_DB:-sqlassistant_db}
+    ports:
+      - "5433:5432"
+    volumes:
+      - task2_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${TASK2_POSTGRES_USER:-sqlassistant_user}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  task2-backend:
+    build: ./task2-ai-sql-assistant/backend
+    restart: unless-stopped
+    env_file:
+      - ./task2-ai-sql-assistant/backend/.env
+    environment:
+      POSTGRES_SERVER: task2-db
+      POSTGRES_PORT: 5432
+    depends_on:
+      task2-db:
+        condition: service_healthy
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./task2-ai-sql-assistant/backend:/app
+
+  task2-frontend:
+    build:
+      context: ./task2-ai-sql-assistant/frontend
+      target: dev
+    restart: unless-stopped
+    depends_on:
+      - task2-backend
+    ports:
+      - "4201:4201"
+    volumes:
+      - ./task2-ai-sql-assistant/frontend:/app
+      - /app/node_modules
+
+volumes:
+  task1_pgdata:
+  task2_pgdata:

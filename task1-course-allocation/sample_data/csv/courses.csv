@@ -1,0 +1,9 @@
+course_name,course_code,total_seats,reserved_obc,reserved_sc,reserved_st
+Computer Science Engineering,CSE,40,8,5,3
+Electronics & Communication,ECE,35,7,4,2
+Mechanical Engineering,MECH,30,6,4,2
+Civil Engineering,CIVIL,25,5,3,2
+Information Technology,IT,30,6,3,2
+Electrical Engineering,EEE,25,5,3,1
+Biotechnology,BT,20,4,2,1
+Data Science,DS,20,4,2,1

@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+
+# Env files with real secrets
+.env
+.env.prod
+!.env.example
+!.env.prod.example
+
+# Node / Angular
+node_modules/
+dist/
+.angular/
+
+# OS
+.DS_Store
+
+# Docker
+*.log
+
+# Task 2 specific
+task2-ai-sql-assistant/backend/.venv/

@@ -1,0 +1,30 @@
+name: Task 2 - Frontend CI
+
+on:
+  push:
+    branches: [main]
+    paths: ["task2-ai-sql-assistant/frontend/**", ".github/workflows/task2-frontend-ci.yml"]
+  pull_request:
+    paths: ["task2-ai-sql-assistant/frontend/**"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: task2-ai-sql-assistant/frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: task2-ai-sql-assistant/frontend/package.json
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build production bundle
+        run: npm run build

@@ -1,0 +1,40 @@
+name: Task 2 - Backend CI
+
+on:
+  push:
+    branches: [main]
+    paths: ["task2-ai-sql-assistant/backend/**", ".github/workflows/task2-backend-ci.yml"]
+  pull_request:
+    paths: ["task2-ai-sql-assistant/backend/**"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: task2-ai-sql-assistant/backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: task2-ai-sql-assistant/backend/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Lint (ruff)
+        run: |
+          pip install ruff
+          ruff check app tests
+
+      - name: Run tests
+        run: pytest -v --tb=short
+        # Note: all 30 tests in this suite (SQL validator + dataset ingestion
+        # sanitization) are pure unit tests with no DB dependency by design —
+        # see tests/test_sql_validator.py and tests/test_dataset_service.py.
+        # This is intentional: the highest-value tests here are exactly the
+        # ones that must never depend on a live database to run in CI.

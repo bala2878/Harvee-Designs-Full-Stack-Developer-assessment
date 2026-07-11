@@ -1,0 +1,115 @@
+version: "3.9"
+
+# Production stack for the AWS VPS — both tasks, each with its own DB,
+# on an internal network host Nginx never touches directly. Host Nginx
+# (deploy/nginx/) reverse-proxies to task1-frontend:8080 and
+# task2-frontend:8081 on two subdomains. See deploy/deploy.sh.
+#
+# IMPORTANT: both backends' Settings classes read generically-named vars
+# (POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB, ANTHROPIC_API_KEY, ...).
+# A single shared `env_file: .env.prod` would make both services resolve
+# the SAME values — harmless for a shared ANTHROPIC_API_KEY, but wrong for
+# per-task DB credentials. So `.env.prod` defines TASK1_* / TASK2_*
+# variables, and each service's own `environment:` block maps them onto the
+# generic names that service's Settings class actually expects.
+
+services:
+  task1-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${TASK1_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${TASK1_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${TASK1_POSTGRES_DB}
+    volumes: [task1_pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [task1-internal]
+
+  task1-backend:
+    build: ./task1-course-allocation/backend
+    image: harvee-task1-backend:latest
+    restart: unless-stopped
+    environment:
+      ENVIRONMENT: production
+      DEBUG: "false"
+      POSTGRES_SERVER: task1-db
+      POSTGRES_USER: ${TASK1_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${TASK1_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${TASK1_POSTGRES_DB}
+      SECRET_KEY: ${TASK1_SECRET_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      BACKEND_CORS_ORIGINS: ${TASK1_CORS_ORIGIN}
+    depends_on:
+      task1-db: { condition: service_healthy }
+    expose: ["8000"]
+    networks: [task1-internal, web]
+
+  task1-frontend:
+    build:
+      context: ./task1-course-allocation/frontend
+      target: production
+      args: { API_BASE_URL: /api/v1 }
+    image: harvee-task1-frontend:latest
+    restart: unless-stopped
+    ports: ["127.0.0.1:8080:80"]
+    depends_on: [task1-backend]
+    networks: [web]
+
+  task2-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${TASK2_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${TASK2_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${TASK2_POSTGRES_DB}
+    volumes: [task2_pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [task2-internal]
+
+  task2-backend:
+    build: ./task2-ai-sql-assistant/backend
+    image: harvee-task2-backend:latest
+    restart: unless-stopped
+    environment:
+      ENVIRONMENT: production
+      DEBUG: "false"
+      POSTGRES_SERVER: task2-db
+      POSTGRES_USER: ${TASK2_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${TASK2_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${TASK2_POSTGRES_DB}
+      READONLY_DB_USER: ${TASK2_READONLY_DB_USER}
+      READONLY_DB_PASSWORD: ${TASK2_READONLY_DB_PASSWORD}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      BACKEND_CORS_ORIGINS: ${TASK2_CORS_ORIGIN}
+    depends_on:
+      task2-db: { condition: service_healthy }
+    expose: ["8001"]
+    networks: [task2-internal, web]
+
+  task2-frontend:
+    build:
+      context: ./task2-ai-sql-assistant/frontend
+      target: production
+      args: { API_BASE_URL: /api/v1 }
+    image: harvee-task2-frontend:latest
+    restart: unless-stopped
+    ports: ["127.0.0.1:8081:80"]
+    depends_on: [task2-backend]
+    networks: [web]
+
+volumes:
+  task1_pgdata:
+  task2_pgdata:
+
+networks:
+  task1-internal:
+  task2-internal:
+  web:

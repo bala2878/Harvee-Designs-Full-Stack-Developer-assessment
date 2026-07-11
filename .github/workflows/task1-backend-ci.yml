@@ -1,0 +1,62 @@
+name: Task 1 - Backend CI
+
+on:
+  push:
+    branches: [main]
+    paths: ["task1-course-allocation/backend/**", ".github/workflows/task1-backend-ci.yml"]
+  pull_request:
+    paths: ["task1-course-allocation/backend/**"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: task1-course-allocation/backend
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: allocation_user
+          POSTGRES_PASSWORD: allocation_pass
+          POSTGRES_DB: allocation_db_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U allocation_user"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: task1-course-allocation/backend/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Lint (ruff)
+        run: |
+          pip install ruff
+          ruff check app tests
+
+      - name: Run Alembic migrations against test DB
+        env:
+          POSTGRES_SERVER: localhost
+          POSTGRES_USER: allocation_user
+          POSTGRES_PASSWORD: allocation_pass
+          POSTGRES_DB: allocation_db_test
+        run: alembic upgrade head
+
+      - name: Run tests
+        env:
+          POSTGRES_SERVER: localhost
+          POSTGRES_USER: allocation_user
+          POSTGRES_PASSWORD: allocation_pass
+          POSTGRES_DB: allocation_db_test
+        run: pytest -v --tb=short
